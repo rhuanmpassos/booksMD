@@ -3,6 +3,10 @@
   "outputDirectory": "dist/booksmd/browser",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "http://52.87.194.234:8000/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
