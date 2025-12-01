@@ -1,11 +1,12 @@
 // Função serverless do Vercel para fazer proxy do upload de arquivo
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Readable } from 'stream';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
 
 export const config = {
   api: {
-    bodyParser: false, // Desabilita bodyParser para receber FormData raw
+    bodyParser: false, // Importante: desabilita bodyParser para receber FormData raw
   },
 };
 
@@ -28,26 +29,26 @@ export default async function handler(
   }
 
   try {
-    // Lê o body como stream e repassa para o backend
+    // O Vercel passa o body como stream quando bodyParser está desabilitado
     const chunks: Buffer[] = [];
+    const stream = req as any;
     
-    // Se req.body é um stream, lê ele
-    if (req.body && typeof req.body.pipe === 'function') {
-      for await (const chunk of req.body) {
-        chunks.push(chunk);
-      }
-    } else if (req.body) {
-      chunks.push(Buffer.from(req.body));
+    // Lê o stream do body
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
     }
 
     const bodyBuffer = Buffer.concat(chunks);
 
-    // Faz requisição para o backend com o body raw
+    // Faz requisição para o backend com o body raw e Content-Type correto
+    const contentType = req.headers['content-type'] || 'multipart/form-data';
+    
     const response = await fetch(`${BACKEND_URL}/api/upload`, {
       method: 'POST',
       body: bodyBuffer,
       headers: {
-        'Content-Type': req.headers['content-type'] || 'multipart/form-data',
+        'Content-Type': contentType,
+        'Content-Length': bodyBuffer.length.toString(),
       }
     });
 
