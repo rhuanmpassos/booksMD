@@ -11,6 +11,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/test",
+      "destination": "/api/test"
+    },
+    {
       "source": "/api/upload",
       "destination": "/api/upload"
     },
@@ -35,4 +39,3 @@
     }
   ]
 }
-
