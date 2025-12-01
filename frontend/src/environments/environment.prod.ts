@@ -1,6 +1,5 @@
 export const environment = {
   production: true,
-  // URL do backend no Render - será atualizada após o deploy
-  // Formato: https://booksmd-backend.onrender.com
+  // URL do backend no Render (HTTPS gratuito)
   apiUrl: 'https://booksmd-backend.onrender.com'
 };
