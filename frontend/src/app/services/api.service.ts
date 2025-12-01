@@ -50,7 +50,8 @@ export class ApiService {
 
     // Para upload de arquivo, precisa usar multipart/form-data
     return this.http.post<UploadResponse>(`${this.baseUrl}/api/upload`, formData, {
-      reportProgress: true
+      reportProgress: true,
+      // Headers serão definidos automaticamente pelo browser para FormData
     });
   }
 

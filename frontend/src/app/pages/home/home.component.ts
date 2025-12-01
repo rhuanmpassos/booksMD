@@ -279,9 +279,20 @@ export class HomeComponent {
       error: (err) => {
         this.isUploading = false;
         console.error('Erro no upload:', err);
-        // Mostra erro mais detalhado para debug
-        const errorMsg = err.error?.detail || err.message || err.statusText || 'Erro desconhecido';
-        this.error = `Erro ao enviar arquivo: ${errorMsg} (Status: ${err.status || 'N/A'})`;
+        
+        // Trata diferentes tipos de erro
+        let errorMsg = 'Erro ao enviar arquivo. Tente novamente.';
+        
+        if (err.status === 0) {
+          // Status 0 geralmente significa CORS ou Mixed Content bloqueado
+          errorMsg = 'Erro de conexão. Verifique se o backend está acessível e se CORS está configurado.';
+        } else if (err.error?.detail) {
+          errorMsg = err.error.detail;
+        } else if (err.message) {
+          errorMsg = err.message;
+        }
+        
+        this.error = errorMsg;
       }
     });
   }
