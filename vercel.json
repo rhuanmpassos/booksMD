@@ -2,47 +2,28 @@
   "version": 2,
   "builds": [
     {
+      "src": "api/**/*.ts",
+      "use": "@vercel/node"
+    },
+    {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist/booksmd/browser"
       }
-    },
-    {
-      "src": "api/*.ts",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/test",
-      "dest": "/api/test.ts"
-    },
-    {
-      "src": "/api/upload",
-      "dest": "/api/upload.ts"
-    },
-    {
       "src": "/api/(.*)",
-      "dest": "/api/proxy.ts"
+      "dest": "/api/$1.ts"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/dist/booksmd/browser/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+      "dest": "/frontend/dist/booksmd/browser/$1"
     }
   ]
 }
