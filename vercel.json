@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build -- --configuration production",
-  "outputDirectory": "frontend/dist/booksmd/browser",
+  "buildCommand": "npm install && npm run build -- --configuration production",
+  "outputDirectory": "dist/booksmd/browser",
   "rewrites": [
     {
       "source": "/(.*)",
