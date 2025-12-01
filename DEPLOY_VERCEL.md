@@ -46,13 +46,13 @@ O arquivo `vercel.json` já está criado na raiz do projeto:
 3. Clique em "Add New Project"
 4. Importe o repositório `booksmd`
 5. Configure:
-   - **Framework Preset**: Angular (ou "Other")
-   - **Root Directory**: Deixe vazio (raiz do projeto)
-   - **Build Command**: `npm run build` (já configurado no `package.json` da raiz)
-   - **Output Directory**: `frontend/dist/booksmd`
+   - **Framework Preset**: Angular
+   - **Root Directory**: `frontend` ⚠️ **IMPORTANTE: Configure isso!**
+   - **Build Command**: `npm install && npm run build` (ou deixe vazio para usar o padrão)
+   - **Output Directory**: `dist/booksmd/browser` (relativo ao `frontend`)
 6. Clique em "Deploy"
 
-**Nota:** O `package.json` na raiz contém o script de build que entra no diretório `frontend` e executa o build do Angular.
+**Nota:** Com o Root Directory configurado como `frontend`, todos os caminhos no `vercel.json` são relativos ao diretório `frontend`, não incluindo o prefixo `frontend/`.
 
 ### 3. Anotar URL do Frontend
 

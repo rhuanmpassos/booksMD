@@ -48,7 +48,10 @@ export class ApiService {
     const formData = new FormData();
     formData.append('file', file);
 
-    return this.http.post<UploadResponse>(`${this.baseUrl}/api/upload`, formData);
+    // Para upload de arquivo, precisa usar multipart/form-data
+    return this.http.post<UploadResponse>(`${this.baseUrl}/api/upload`, formData, {
+      reportProgress: true
+    });
   }
 
   /**
