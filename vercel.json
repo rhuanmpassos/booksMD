@@ -1,30 +1,37 @@
 {
-  "buildCommand": "npm install && npm run build -- --configuration production",
-  "outputDirectory": "dist/booksmd/browser",
-  "functions": {
-    "api/upload.ts": {
-      "maxDuration": 60
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist/booksmd/browser"
+      }
     },
-    "api/proxy.ts": {
-      "maxDuration": 30
+    {
+      "src": "api/*.ts",
+      "use": "@vercel/node"
     }
-  },
-  "rewrites": [
+  ],
+  "routes": [
     {
-      "source": "/api/test",
-      "destination": "/api/test"
+      "src": "/api/test",
+      "dest": "/api/test.ts"
     },
     {
-      "source": "/api/upload",
-      "destination": "/api/upload"
+      "src": "/api/upload",
+      "dest": "/api/upload.ts"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/proxy"
+      "src": "/api/(.*)",
+      "dest": "/api/proxy.ts"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/dist/booksmd/browser/index.html"
     }
   ],
   "headers": [

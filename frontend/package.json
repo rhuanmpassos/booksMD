@@ -4,8 +4,8 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
-    "build:prod": "ng build --configuration production",
+    "build": "ng build --configuration production",
+    "build:dev": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "set-api-url": "node replace-api-url.js"
