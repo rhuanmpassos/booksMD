@@ -3,6 +3,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
 
+export const config = {
+  api: {
+    bodyParser: false, // Desabilita bodyParser para receber FormData raw
+  },
+};
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -22,24 +28,27 @@ export default async function handler(
   }
 
   try {
-    // Para upload, precisa passar o body raw (FormData)
-    // O Vercel já parseia o FormData em req.body
-    const formData = new FormData();
+    // Lê o body como stream e repassa para o backend
+    const chunks: Buffer[] = [];
     
-    // Se o body for um objeto (Vercel parseia FormData)
-    if (req.body && typeof req.body === 'object') {
-      for (const [key, value] of Object.entries(req.body)) {
-        if (value) {
-          formData.append(key, value as any);
-        }
+    // Se req.body é um stream, lê ele
+    if (req.body && typeof req.body.pipe === 'function') {
+      for await (const chunk of req.body) {
+        chunks.push(chunk);
       }
+    } else if (req.body) {
+      chunks.push(Buffer.from(req.body));
     }
 
-    // Faz requisição para o backend
+    const bodyBuffer = Buffer.concat(chunks);
+
+    // Faz requisição para o backend com o body raw
     const response = await fetch(`${BACKEND_URL}/api/upload`, {
       method: 'POST',
-      body: formData,
-      // Não define Content-Type, deixa o fetch definir automaticamente para FormData
+      body: bodyBuffer,
+      headers: {
+        'Content-Type': req.headers['content-type'] || 'multipart/form-data',
+      }
     });
 
     const data = await response.text();

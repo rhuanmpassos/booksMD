@@ -4,6 +4,8 @@
   "scripts": {
     "build": "cd frontend && npm install && npm run build -- --configuration production",
     "vercel-build": "cd frontend && npm install && npm run build -- --configuration production"
+  },
+  "dependencies": {
+    "@vercel/node": "^3.0.0"
   }
 }
-
