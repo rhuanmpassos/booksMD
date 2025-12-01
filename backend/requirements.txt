@@ -1,0 +1,37 @@
+# FastAPI e servidor
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+dotenv
+
+# Processamento de arquivos
+pymupdf>=1.23.8  # Para extração de PDF (fitz)
+ebooklib>=0.18  # Para extração de EPUB
+chardet>=5.2.0  # Para detecção de encoding em TXT
+beautifulsoup4>=4.12.3  # Para parsing HTML em EPUB
+lxml>=5.1.0  # Parser XML/HTML para BeautifulSoup
+
+# LLM APIs
+openai>=1.12.0  # Para análise com OpenAI GPT
+ollama>=0.4.4  # Para análise com modelos locais Ollama
+huggingface-hub>=0.24.0  # Para análise com Hugging Face
+httpx>=0.27.0  # Cliente HTTP assíncrono para APIs
+boto3>=1.34.0  # Para análise com Amazon Bedrock
+botocore>=1.34.0  # Dependência do boto3
+gradio-client>=1.4.0  # Para análise com Gradio Spaces (Llama 4 Maverick gratuito)
+
+# Tarefas assíncronas (opcional - para processamento em fila)
+celery>=5.3.6  # Sistema de filas de tarefas
+redis>=5.0.1  # Broker para Celery
+
+# Geração de PDF e Markdown
+weasyprint>=60.2  # Conversão de HTML/Markdown para PDF
+markdown>=3.5.2  # Processamento de Markdown (com extensões: extra, codehilite, toc, tables, fenced_code, nl2br)
+pygments>=2.17.0  # Syntax highlighting para extensão codehilite do Markdown (recomendado)
+
+# Utilitários
+python-dotenv>=1.0.1  # Carregamento de variáveis de ambiente do .env
+pydantic>=2.9.0  # Validação de dados e modelos
+pydantic-settings>=2.1.0  # Configurações baseadas em Pydantic
+aiofiles>=23.2.1  # Operações de arquivo assíncronas
+tiktoken>=0.5.2  # Contagem de tokens para divisão de texto

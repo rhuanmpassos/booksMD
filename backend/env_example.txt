@@ -1,0 +1,92 @@
+# ========================================
+# CONFIGURAÇÃO DO BOOKSMD
+# Copie para .env e configure
+# ========================================
+
+# ----------------------------------------
+# PROVIDER DE LLM (escolha um)
+# Opções: "ollama", "openai", "huggingface", "bedrock", "gradio"
+# ----------------------------------------
+LLM_PROVIDER=gradio
+
+# ----------------------------------------
+# OLLAMA (Modelos Locais) - RECOMENDADO
+# Instale: https://ollama.ai
+# ----------------------------------------
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b
+
+# Modelos recomendados para Ollama:
+# - llama3.1:8b     (8GB VRAM, bom equilíbrio)
+# - mistral         (8GB VRAM, rápido)
+# - qwen2.5:14b     (16GB VRAM, excelente português)
+# - mixtral         (24GB VRAM, muito potente)
+# - llama3.1:70b    (40GB+ VRAM, melhor qualidade)
+
+# ----------------------------------------
+# HUGGING FACE (API Gratuita)
+# Token: https://huggingface.co/settings/tokens
+# ----------------------------------------
+HUGGINGFACE_TOKEN=hf_seu_token_aqui
+HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.3
+
+# Modelos gratuitos recomendados:
+# - mistralai/Mistral-7B-Instruct-v0.3
+# - microsoft/Phi-3-mini-4k-instruct
+# - google/gemma-2-9b-it
+
+# ----------------------------------------
+# OPENAI (Pago)
+# ----------------------------------------
+OPENAI_API_KEY=sk-sua-chave-aqui
+OPENAI_MODEL=gpt-4o
+
+# ----------------------------------------
+# GRADIO SPACES (GRATUITO - Llama 4 Maverick 17B)
+# Usa Hugging Face Spaces, não precisa de token!
+# ----------------------------------------
+GRADIO_SPACE_ID=burak/Llama-4-Maverick-17B-Websearch
+GRADIO_USE_WEB_SEARCH=False
+
+# ----------------------------------------
+# AMAZON BEDROCK
+# Modelo: meta.llama4-maverick-17b-instruct-v1:0
+# ----------------------------------------
+BEDROCK_MODEL=meta.llama4-maverick-17b-instruct-v1:0
+BEDROCK_REGION_NAME=us-east-1
+# Opcional: Se não fornecido, usa credenciais padrão do AWS (IAM role, ~/.aws/credentials, etc)
+BEDROCK_AWS_ACCESS_KEY_ID=sua-access-key-id
+BEDROCK_AWS_SECRET_ACCESS_KEY=sua-secret-access-key
+
+# ----------------------------------------
+# SERVIDOR
+# ----------------------------------------
+HOST=0.0.0.0
+PORT=8000
+DEBUG=True
+
+# ----------------------------------------
+# ARMAZENAMENTO
+# ----------------------------------------
+UPLOAD_DIR=./uploads
+OUTPUT_DIR=./outputs
+
+# ----------------------------------------
+# LIMITES (Otimizado para A100 80GB)
+# ----------------------------------------
+MAX_FILE_SIZE_MB=10000
+MAX_TOKENS_PER_CHUNK=1000000
+
+# ----------------------------------------
+# REDIS (Opcional - para filas)
+# ----------------------------------------
+REDIS_URL=redis://localhost:6379/0
+
+# ----------------------------------------
+# CORS (Cross-Origin Resource Sharing)
+# Para acesso remoto do frontend
+# ----------------------------------------
+# Use "*" para aceitar todas as origens (desenvolvimento)
+# Ou liste origens específicas separadas por vírgula (produção)
+# Exemplo: CORS_ORIGINS=http://localhost:4200,http://192.168.1.100:4200
+CORS_ORIGINS=*
