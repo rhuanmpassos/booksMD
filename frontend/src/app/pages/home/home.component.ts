@@ -278,7 +278,10 @@ export class HomeComponent {
       },
       error: (err) => {
         this.isUploading = false;
-        this.error = err.error?.detail || 'Erro ao enviar arquivo. Tente novamente.';
+        console.error('Erro no upload:', err);
+        // Mostra erro mais detalhado para debug
+        const errorMsg = err.error?.detail || err.message || err.statusText || 'Erro desconhecido';
+        this.error = `Erro ao enviar arquivo: ${errorMsg} (Status: ${err.status || 'N/A'})`;
       }
     });
   }
