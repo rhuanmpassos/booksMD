@@ -3,6 +3,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
 
+// Desabilita bodyParser para receber o body raw (FormData)
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -22,31 +29,27 @@ export default async function handler(
   }
 
   try {
-    // O Vercel já parseia FormData em req.body quando content-type é multipart/form-data
-    // Precisamos reconstruir o FormData para enviar ao backend
-    const formData = new FormData();
+    // Lê o body como buffer
+    const chunks: any[] = [];
+    const stream = req as any;
     
-    // Se req.body tem o arquivo (Vercel parseia FormData)
-    if (req.body && typeof req.body === 'object') {
-      for (const [key, value] of Object.entries(req.body)) {
-        if (value) {
-          // Se for um arquivo (tem buffer ou stream)
-          if (value && typeof value === 'object' && 'data' in value) {
-            const file = value as any;
-            const blob = new Blob([Buffer.from(file.data)], { type: file.mimetype || 'application/octet-stream' });
-            formData.append(key, blob, file.filename || 'file');
-          } else {
-            formData.append(key, String(value));
-          }
-        }
-      }
+    // Lê o stream
+    for await (const chunk of stream) {
+      chunks.push(chunk);
     }
 
-    // Faz requisição para o backend
+    const bodyBuffer = Buffer.concat(chunks.map(c => Buffer.isBuffer(c) ? c : Buffer.from(c)));
+
+    // Faz requisição para o backend passando o body raw
+    const contentType = req.headers['content-type'] || 'multipart/form-data';
+    
     const response = await fetch(`${BACKEND_URL}/api/upload`, {
       method: 'POST',
-      body: formData,
-      // Não define Content-Type, deixa o fetch definir automaticamente para FormData
+      body: bodyBuffer,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': bodyBuffer.length.toString(),
+      }
     });
 
     const data = await response.text();
