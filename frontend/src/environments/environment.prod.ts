@@ -1,5 +1,6 @@
 export const environment = {
   production: true,
-  apiUrl: '' // Usa proxy do Vercel (same origin) para evitar Mixed Content
+  // URL do backend no Render - será atualizada após o deploy
+  // Formato: https://booksmd-backend.onrender.com
+  apiUrl: 'https://booksmd-backend.onrender.com'
 };
-

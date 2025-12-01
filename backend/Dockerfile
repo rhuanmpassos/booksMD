@@ -27,5 +27,6 @@ RUN mkdir -p uploads outputs data
 EXPOSE 8000
 
 # Comando de start
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Usa variável PORT do Render (ou 8000 como fallback)
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
 
