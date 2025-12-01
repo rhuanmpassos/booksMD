@@ -12,11 +12,11 @@
   "rewrites": [
     {
       "source": "/api/upload",
-      "destination": "/api/upload.ts"
+      "destination": "/api/upload"
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/proxy.ts"
+      "destination": "/api/proxy"
     },
     {
       "source": "/(.*)",
