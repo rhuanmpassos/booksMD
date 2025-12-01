@@ -3,6 +3,14 @@
   "outputDirectory": "dist/booksmd/browser",
   "rewrites": [
     {
+      "source": "/api/upload",
+      "destination": "/api/upload"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/proxy"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
