@@ -56,3 +56,7 @@ htmlcov/
 build/
 dist/
 
+# AWS Keys
+*.pem
+booksmd-backend-key.pem
+
