@@ -6,6 +6,7 @@
     "vercel-build": "cd frontend && npm install && npm run build -- --configuration production"
   },
   "dependencies": {
-    "@vercel/node": "^3.0.0"
+    "@vercel/node": "^3.0.0",
+    "form-data": "^4.0.0"
   }
 }

@@ -1,12 +1,13 @@
 // Função serverless do Vercel para fazer proxy do upload de arquivo
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import FormData from 'form-data';
+import { Readable } from 'stream';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
 
-// Desabilita bodyParser para receber o body raw (FormData)
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: false, // Desabilita para receber FormData raw
   },
 };
 
@@ -30,25 +31,23 @@ export default async function handler(
 
   try {
     // Lê o body como buffer
-    const chunks: any[] = [];
+    const chunks: Buffer[] = [];
     const stream = req as any;
     
-    // Lê o stream
+    // Lê o stream do body
     for await (const chunk of stream) {
-      chunks.push(chunk);
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
 
-    const bodyBuffer = Buffer.concat(chunks.map(c => Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    const bodyBuffer = Buffer.concat(chunks);
+    const contentType = req.headers['content-type'] || 'multipart/form-data';
 
     // Faz requisição para o backend passando o body raw
-    const contentType = req.headers['content-type'] || 'multipart/form-data';
-    
     const response = await fetch(`${BACKEND_URL}/api/upload`, {
       method: 'POST',
       body: bodyBuffer,
       headers: {
         'Content-Type': contentType,
-        'Content-Length': bodyBuffer.length.toString(),
       }
     });
 
