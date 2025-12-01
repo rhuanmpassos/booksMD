@@ -1,14 +1,7 @@
 // Função serverless do Vercel para fazer proxy do upload de arquivo
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Readable } from 'stream';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
-
-export const config = {
-  api: {
-    bodyParser: false, // Importante: desabilita bodyParser para receber FormData raw
-  },
-};
 
 export default async function handler(
   req: VercelRequest,
@@ -29,27 +22,31 @@ export default async function handler(
   }
 
   try {
-    // O Vercel passa o body como stream quando bodyParser está desabilitado
-    const chunks: Buffer[] = [];
-    const stream = req as any;
+    // O Vercel já parseia FormData em req.body quando content-type é multipart/form-data
+    // Precisamos reconstruir o FormData para enviar ao backend
+    const formData = new FormData();
     
-    // Lê o stream do body
-    for await (const chunk of stream) {
-      chunks.push(Buffer.from(chunk));
+    // Se req.body tem o arquivo (Vercel parseia FormData)
+    if (req.body && typeof req.body === 'object') {
+      for (const [key, value] of Object.entries(req.body)) {
+        if (value) {
+          // Se for um arquivo (tem buffer ou stream)
+          if (value && typeof value === 'object' && 'data' in value) {
+            const file = value as any;
+            const blob = new Blob([Buffer.from(file.data)], { type: file.mimetype || 'application/octet-stream' });
+            formData.append(key, blob, file.filename || 'file');
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      }
     }
 
-    const bodyBuffer = Buffer.concat(chunks);
-
-    // Faz requisição para o backend com o body raw e Content-Type correto
-    const contentType = req.headers['content-type'] || 'multipart/form-data';
-    
+    // Faz requisição para o backend
     const response = await fetch(`${BACKEND_URL}/api/upload`, {
       method: 'POST',
-      body: bodyBuffer,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Length': bodyBuffer.length.toString(),
-      }
+      body: formData,
+      // Não define Content-Type, deixa o fetch definir automaticamente para FormData
     });
 
     const data = await response.text();
