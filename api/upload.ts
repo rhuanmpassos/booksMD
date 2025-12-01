@@ -1,4 +1,4 @@
-// Função serverless do Vercel para fazer proxy do upload
+// Função serverless do Vercel para fazer proxy do upload de arquivo
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
@@ -9,8 +9,8 @@ export default async function handler(
 ) {
   // Permite CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -22,17 +22,15 @@ export default async function handler(
   }
 
   try {
-    // Para upload de arquivo, precisa passar o FormData
+    // Para upload, precisa passar o body raw (FormData)
+    // O Vercel já parseia o FormData em req.body
     const formData = new FormData();
     
-    // Se tiver arquivo no body
+    // Se o body for um objeto (Vercel parseia FormData)
     if (req.body && typeof req.body === 'object') {
-      // Converte body para FormData
       for (const [key, value] of Object.entries(req.body)) {
-        if (value instanceof File || value instanceof Blob) {
-          formData.append(key, value);
-        } else {
-          formData.append(key, String(value));
+        if (value) {
+          formData.append(key, value as any);
         }
       }
     }
@@ -41,9 +39,7 @@ export default async function handler(
     const response = await fetch(`${BACKEND_URL}/api/upload`, {
       method: 'POST',
       body: formData,
-      headers: {
-        // Não passa Content-Type, deixa o fetch definir automaticamente para FormData
-      }
+      // Não define Content-Type, deixa o fetch definir automaticamente para FormData
     });
 
     const data = await response.text();
@@ -51,11 +47,10 @@ export default async function handler(
     res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
     res.status(response.status).send(data);
   } catch (error: any) {
-    console.error('Proxy error:', error);
+    console.error('Upload proxy error:', error);
     res.status(500).json({ 
       error: 'Proxy error', 
       message: error.message
     });
   }
 }
-

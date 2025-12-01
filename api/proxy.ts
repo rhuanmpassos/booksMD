@@ -1,4 +1,4 @@
-// Função serverless do Vercel para fazer proxy das requisições
+// Função serverless do Vercel para fazer proxy das requisições (exceto upload)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
@@ -22,13 +22,10 @@ export default async function handler(
   const targetUrl = `${BACKEND_URL}${path}`;
 
   try {
-    // Para requisições com body
     const options: RequestInit = {
       method: req.method,
       headers: {
-        ...(req.headers as any),
-        host: undefined, // Remove host header
-        'content-type': req.headers['content-type'] || 'application/json',
+        'Content-Type': req.headers['content-type'] || 'application/json',
       }
     };
 
@@ -37,7 +34,6 @@ export default async function handler(
       if (req.headers['content-type']?.includes('application/json')) {
         options.body = JSON.stringify(req.body);
       } else {
-        // Para FormData, precisa passar o body original
         options.body = req.body as any;
       }
     }
@@ -45,7 +41,6 @@ export default async function handler(
     const response = await fetch(targetUrl, options);
     const data = await response.text();
     
-    // Copia headers importantes
     res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
     res.status(response.status).send(data);
   } catch (error: any) {
