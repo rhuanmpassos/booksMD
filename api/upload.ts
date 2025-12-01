@@ -1,7 +1,5 @@
 // Função serverless do Vercel para fazer proxy do upload de arquivo
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import FormData from 'form-data';
-import { Readable } from 'stream';
 
 const BACKEND_URL = 'http://52.87.194.234:8000';
 
