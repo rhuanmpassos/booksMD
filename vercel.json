@@ -9,18 +9,18 @@
       "maxDuration": 30
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/upload",
-      "destination": "/api/upload"
+      "src": "/api/upload",
+      "dest": "/api/upload.ts"
     },
     {
-      "source": "/api/:path*",
-      "destination": "/api/proxy"
+      "src": "/api/(.*)",
+      "dest": "/api/proxy.ts"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "headers": [
