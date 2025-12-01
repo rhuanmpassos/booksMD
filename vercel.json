@@ -1,6 +1,14 @@
 {
   "buildCommand": "npm install && npm run build -- --configuration production",
   "outputDirectory": "dist/booksmd/browser",
+  "functions": {
+    "api/upload.ts": {
+      "maxDuration": 60
+    },
+    "api/proxy.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
       "source": "/api/upload",
