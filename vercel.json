@@ -1,8 +1,7 @@
 {
-  "buildCommand": "npm install && npm run build",
-  "outputDirectory": "dist/booksmd",
+  "buildCommand": "npm run build",
+  "outputDirectory": "frontend/dist/booksmd",
   "framework": "angular",
-  "rootDirectory": "frontend",
   "rewrites": [
     {
       "source": "/(.*)",
