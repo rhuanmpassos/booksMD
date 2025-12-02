@@ -1,7 +1,7 @@
 // POST /api/extract - Extrai texto e divide em capítulos
 import { put, list } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import * as pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
