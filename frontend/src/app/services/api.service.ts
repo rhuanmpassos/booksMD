@@ -2,14 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, from, of } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface UploadResponse {
   job_id: string;
   message: string;
   filename: string;
-  fileUrl: string;
-  fileType: string;
 }
 
 export interface BookMetadata {
@@ -70,39 +67,27 @@ export class ApiService {
   }
 
   private async uploadToBlob(file: File): Promise<UploadResponse> {
-    // Gera o jobId NO FRONTEND antes do upload
-    const jobId = uuidv4();
-    console.log('Generated jobId on frontend:', jobId);
+    // Importa dinamicamente o cliente do Vercel Blob
+    const { upload } = await import('@vercel/blob/client');
+    
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: `${this.baseUrl}/api/upload`,
+    });
 
-    try {
-      // Importa dinamicamente o cliente do Vercel Blob
-      const { upload } = await import('@vercel/blob/client');
-      
-      // Inclui o jobId no pathname para que o backend possa usar
-      // O formato será: __jobId__<uuid>__<filename>
-      const pathnameWithJobId = `__jobId__${jobId}__${file.name}`;
-      
-      const blob = await upload(pathnameWithJobId, file, {
-        access: 'public',
-        handleUploadUrl: `${this.baseUrl}/api/upload`,
-      });
-
-      console.log('Blob upload complete:', blob);
-
-      // Extrai tipo do arquivo
-      const fileType = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-
-      return {
-        job_id: jobId,
-        message: 'Upload successful',
-        filename: file.name,
-        fileUrl: blob.url,
-        fileType: fileType,
-      };
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
+    // Extrai job_id do pathname (formato: books/{jobId}/filename)
+    const pathParts = blob.pathname.split('/');
+    const jobId = pathParts.length >= 2 ? pathParts[1] : '';
+    
+    if (!jobId) {
+      throw new Error('Failed to get job ID from upload response');
     }
+
+    return {
+      job_id: jobId,
+      message: 'Upload successful',
+      filename: file.name,
+    };
   }
 
   /**
@@ -115,13 +100,8 @@ export class ApiService {
   /**
    * Extract text and split into chapters
    */
-  extractChapters(jobId: string, fileUrl?: string, filename?: string, fileType?: string): Observable<ExtractResponse> {
-    return this.http.post<ExtractResponse>(`${this.baseUrl}/api/extract`, { 
-      jobId, 
-      fileUrl, 
-      filename, 
-      fileType 
-    });
+  extractChapters(jobId: string): Observable<ExtractResponse> {
+    return this.http.post<ExtractResponse>(`${this.baseUrl}/api/extract`, { jobId });
   }
 
   /**
@@ -145,17 +125,16 @@ export class ApiService {
    * Process entire book (orchestrates all steps)
    * This is called from the frontend to process chapter by chapter
    */
-  processBook(jobId: string, onProgress: (status: JobStatus) => void, uploadInfo?: { fileUrl: string; filename: string; fileType: string }): Observable<JobStatus> {
+  processBook(jobId: string, onProgress: (status: JobStatus) => void): Observable<JobStatus> {
     return new Observable(observer => {
-      this.runProcessing(jobId, onProgress, observer, uploadInfo);
+      this.runProcessing(jobId, onProgress, observer);
     });
   }
 
   private async runProcessing(
     jobId: string, 
     onProgress: (status: JobStatus) => void,
-    observer: any,
-    uploadInfo?: { fileUrl: string; filename: string; fileType: string }
+    observer: any
   ) {
     try {
       // 1. Extract chapters
@@ -167,13 +146,7 @@ export class ApiService {
         output_ready: false
       });
 
-      // Passa a URL do arquivo se disponível
-      const extractResult = await this.extractChapters(
-        jobId, 
-        uploadInfo?.fileUrl, 
-        uploadInfo?.filename, 
-        uploadInfo?.fileType
-      ).toPromise();
+      const extractResult = await this.extractChapters(jobId).toPromise();
       
       if (!extractResult?.success) {
         throw new Error('Failed to extract chapters');
