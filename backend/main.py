@@ -181,9 +181,15 @@ async def root():
     }
 
 
+@app.get("/ping")
+async def ping():
+    """Endpoint leve para keep-alive."""
+    return {"status": "ok"}
+
+
 @app.get("/health")
 async def health():
-    """Health check."""
+    """Health check completo."""
     settings = get_settings()
     gpu_info = get_gpu_info()
     return {
