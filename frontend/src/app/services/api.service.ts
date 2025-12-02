@@ -67,44 +67,69 @@ export class ApiService {
   }
 
   private async uploadToBlob(file: File): Promise<UploadResponse> {
-    // Importa dinamicamente o cliente do Vercel Blob
-    const { upload } = await import('@vercel/blob/client');
-    
-    const blob = await upload(file.name, file, {
-      access: 'public',
-      handleUploadUrl: `${this.baseUrl}/api/upload`,
-    });
+    let capturedJobId = '';
 
-    console.log('Blob upload response:', blob);
-
-    // Extrai job_id do pathname (formato: books/{jobId}/filename)
-    // pathname pode ser: "books/uuid/filename.pdf" ou apenas o nome do arquivo
-    const pathname = blob.pathname || '';
-    let jobId = '';
-
-    if (pathname.startsWith('books/')) {
-      const pathParts = pathname.split('/');
-      jobId = pathParts[1] || '';
-    } else {
-      // Tenta extrair da URL
-      // URL format: https://xxx.blob.vercel-storage.com/books/uuid/filename.pdf
-      const urlParts = blob.url.split('/');
-      const booksIndex = urlParts.findIndex(p => p === 'books');
-      if (booksIndex !== -1 && urlParts[booksIndex + 1]) {
-        jobId = urlParts[booksIndex + 1];
+    // Intercepta a resposta do token para capturar o jobId
+    const originalFetch = window.fetch;
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await originalFetch(input, init);
+      
+      // Verifica se é a resposta do upload endpoint
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/api/upload') && init?.method === 'POST') {
+        try {
+          const clonedResponse = response.clone();
+          const data = await clonedResponse.json();
+          if (data.jobId) {
+            capturedJobId = data.jobId;
+            console.log('Captured jobId:', capturedJobId);
+          }
+        } catch (e) {
+          // Ignora erros de parse
+        }
       }
-    }
-    
-    if (!jobId) {
-      console.error('Could not extract jobId. Pathname:', pathname, 'URL:', blob.url);
-      throw new Error('Failed to get job ID from upload response');
-    }
-
-    return {
-      job_id: jobId,
-      message: 'Upload successful',
-      filename: file.name,
+      
+      return response;
     };
+
+    try {
+      // Importa dinamicamente o cliente do Vercel Blob
+      const { upload } = await import('@vercel/blob/client');
+      
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: `${this.baseUrl}/api/upload`,
+      });
+
+      console.log('Blob upload complete:', blob);
+
+      // Restaura fetch original
+      window.fetch = originalFetch;
+
+      if (!capturedJobId) {
+        // Fallback: tenta extrair da URL do blob
+        const urlParts = blob.url.split('/');
+        const booksIndex = urlParts.findIndex(p => p === 'books');
+        if (booksIndex !== -1 && urlParts[booksIndex + 1]) {
+          capturedJobId = urlParts[booksIndex + 1];
+        }
+      }
+
+      if (!capturedJobId) {
+        console.error('Could not get jobId. Blob:', blob);
+        throw new Error('Failed to get job ID from upload response');
+      }
+
+      return {
+        job_id: capturedJobId,
+        message: 'Upload successful',
+        filename: file.name,
+      };
+    } catch (error) {
+      // Restaura fetch original em caso de erro
+      window.fetch = originalFetch;
+      throw error;
+    }
   }
 
   /**
