@@ -2,6 +2,10 @@
   "buildCommand": "npm install && npm run build -- --configuration production",
   "outputDirectory": "dist/booksmd/browser",
   "functions": {
+    "api/upload.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
     "api/**/*.ts": {
       "maxDuration": 60
     }

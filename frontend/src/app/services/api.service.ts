@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, Subject, timer, switchMap, takeUntil, tap, catchError, of, from, concatMap, delay } from 'rxjs';
+import { Observable, Subject, from } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface UploadResponse {
@@ -60,13 +60,34 @@ export class ApiService {
   private cancelProcessing$ = new Subject<void>();
 
   /**
-   * Upload a book file
+   * Upload a book file using Vercel Blob client-side upload
    */
   uploadBook(file: File): Observable<UploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
+    return from(this.uploadToBlob(file));
+  }
 
-    return this.http.post<UploadResponse>(`${this.baseUrl}/api/upload`, formData);
+  private async uploadToBlob(file: File): Promise<UploadResponse> {
+    // Importa dinamicamente o cliente do Vercel Blob
+    const { upload } = await import('@vercel/blob/client');
+    
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: `${this.baseUrl}/api/upload`,
+    });
+
+    // Extrai job_id do pathname (formato: books/{jobId}/filename)
+    const pathParts = blob.pathname.split('/');
+    const jobId = pathParts.length >= 2 ? pathParts[1] : '';
+    
+    if (!jobId) {
+      throw new Error('Failed to get job ID from upload response');
+    }
+
+    return {
+      job_id: jobId,
+      message: 'Upload successful',
+      filename: file.name,
+    };
   }
 
   /**
