@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  // URL do backend no Render (HTTPS gratuito)
-  apiUrl: 'https://booksmd-backend.onrender.com'
+  // API rodando no mesmo domínio (Vercel Serverless Functions)
+  apiUrl: ''
 };

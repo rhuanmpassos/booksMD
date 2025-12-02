@@ -1,8 +1,8 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { interval, Subscription, switchMap, takeWhile } from 'rxjs';
-import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service';
+import { Subscription } from 'rxjs';
+import { ApiService, JobStatus } from '../../services/api.service';
 
 @Component({
   selector: 'app-status',
@@ -26,7 +26,7 @@ import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service'
             <!-- Loading State -->
             <div class="flex flex-col items-center justify-center py-12">
               <div class="w-16 h-16 border-4 border-gold-500/20 border-t-gold-500 rounded-full animate-spin mb-6"></div>
-              <p class="text-ink-400">Carregando status...</p>
+              <p class="text-ink-400">Iniciando processamento...</p>
             </div>
           } @else if (error) {
             <!-- Error State -->
@@ -131,7 +131,7 @@ import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service'
             }
             
             <!-- Download Section -->
-            @if (isCompleted() && downloadInfo) {
+            @if (isCompleted()) {
               <div class="border-t border-ink-700/30 pt-8">
                 <h3 class="text-lg font-semibold text-ink-100 mb-6 text-center">
                   Download da Análise
@@ -139,7 +139,7 @@ import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service'
                 
                 <div class="grid md:grid-cols-2 gap-4">
                   <!-- Markdown Download -->
-                  @if (downloadInfo?.md_available) {
+                  @if (status.md_ready) {
                     <a [href]="api.getMarkdownDownloadUrl(jobId)" 
                        download
                        class="flex items-center gap-4 p-5 rounded-xl bg-ink-800/30 border border-ink-700/30 hover:border-gold-500/30 hover:bg-ink-800/50 transition-all group">
@@ -151,7 +151,7 @@ import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service'
                       </div>
                       <div class="flex-1">
                         <p class="font-semibold text-ink-100 group-hover:text-gold-300 transition-colors">Markdown</p>
-                        <p class="text-sm text-ink-400">{{ downloadInfo?.md_filename || 'analysis.md' }}</p>
+                        <p class="text-sm text-ink-400">Análise completa em .md</p>
                       </div>
                       <svg class="w-5 h-5 text-ink-500 group-hover:text-gold-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -160,8 +160,8 @@ import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service'
                     </a>
                   }
                   
-                  <!-- PDF Download -->
-                  @if (downloadInfo?.pdf_available) {
+                  <!-- PDF Download (se disponível) -->
+                  @if (status.pdf_ready) {
                     <a [href]="api.getPdfDownloadUrl(jobId)" 
                        download
                        class="flex items-center gap-4 p-5 rounded-xl bg-ink-800/30 border border-ink-700/30 hover:border-wine-500/30 hover:bg-ink-800/50 transition-all group">
@@ -173,7 +173,7 @@ import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service'
                       </div>
                       <div class="flex-1">
                         <p class="font-semibold text-ink-100 group-hover:text-wine-300 transition-colors">PDF</p>
-                        <p class="text-sm text-ink-400">{{ downloadInfo?.pdf_filename || 'analysis.pdf' }}</p>
+                        <p class="text-sm text-ink-400">Análise formatada em .pdf</p>
                       </div>
                       <svg class="w-5 h-5 text-ink-500 group-hover:text-wine-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -182,6 +182,10 @@ import { ApiService, JobStatus, DownloadInfo } from '../../services/api.service'
                     </a>
                   }
                 </div>
+                
+                <p class="text-xs text-ink-500 text-center mt-4">
+                  ⚠️ Os arquivos serão excluídos automaticamente após o download
+                </p>
                 
                 <!-- New Analysis -->
                 <div class="mt-8 text-center">
@@ -207,11 +211,10 @@ export class StatusComponent implements OnInit, OnDestroy {
   
   jobId = '';
   status: JobStatus | null = null;
-  downloadInfo: DownloadInfo | null = null;
   loading = true;
   error = '';
   
-  private pollSubscription?: Subscription;
+  private processingSubscription?: Subscription;
   
   processingSteps = [
     { key: 'extracting', label: 'Extração' },
@@ -229,67 +232,50 @@ export class StatusComponent implements OnInit, OnDestroy {
       return;
     }
     
-    this.startPolling();
+    // Inicia o processamento automaticamente
+    this.startProcessing();
   }
   
   ngOnDestroy() {
-    this.pollSubscription?.unsubscribe();
+    this.processingSubscription?.unsubscribe();
+    this.api.cancelProcessing();
   }
   
-  private startPolling() {
-    // Initial fetch
-    this.fetchStatus();
+  private startProcessing() {
+    this.loading = false;
     
-    // Poll every 2 seconds
-    this.pollSubscription = interval(2000)
-      .pipe(
-        takeWhile(() => {
-          const completed = this.isCompleted();
-          const failed = this.isFailed();
-          // Para polling se completou ou falhou
-          if (completed || failed) {
-            return false;
-          }
-          return true;
-        })
-      )
-      .subscribe(() => this.fetchStatus());
-  }
-  
-  private fetchStatus() {
-    this.api.getJobStatus(this.jobId).subscribe({
-      next: (status) => {
+    // Inicia com status pendente
+    this.status = {
+      job_id: this.jobId,
+      status: 'pending',
+      progress: 0,
+      current_step: 'Iniciando processamento...',
+      output_ready: false
+    };
+    
+    // Processa o livro (orquestra todas as etapas)
+    this.processingSubscription = this.api.processBook(
+      this.jobId,
+      (status) => {
+        // Callback de progresso
         this.status = status;
-        this.loading = false;
-        
-        // SÓ busca download info quando output_ready for true
-        if (status.output_ready === true) {
-          this.fetchDownloadInfo();
-        }
+      }
+    ).subscribe({
+      next: (finalStatus) => {
+        this.status = finalStatus;
       },
       error: (err) => {
-        this.loading = false;
-        this.error = err.error?.detail || 'Erro ao carregar status';
-      }
-    });
-  }
-  
-  private fetchDownloadInfo() {
-    // Só busca download info quando output_ready é true
-    this.api.getDownloadInfo(this.jobId).subscribe({
-      next: (info) => {
-        this.downloadInfo = info;
-      },
-      error: () => {
-        // Se falhar, limpa downloadInfo para não mostrar downloads
-        this.downloadInfo = null;
+        this.error = err.message || 'Erro no processamento';
+        if (this.status) {
+          this.status.status = 'failed';
+          this.status.error_message = this.error;
+        }
       }
     });
   }
   
   isCompleted(): boolean {
-    // Considera completo apenas quando output_ready for true
-    return this.status?.output_ready === true || this.status?.status === 'completed';
+    return this.status?.status === 'completed' && this.status?.output_ready === true;
   }
   
   isFailed(): boolean {
@@ -358,4 +344,3 @@ export class StatusComponent implements OnInit, OnDestroy {
     return 'bg-ink-700/50 text-ink-500';
   }
 }
-

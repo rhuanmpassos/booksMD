@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpEvent, HttpEventType } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Observable, Subject, timer, switchMap, takeUntil, tap, catchError, of, from, concatMap, delay } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface UploadResponse {
@@ -25,13 +25,28 @@ export interface JobStatus {
   error_message?: string;
   metadata?: BookMetadata;
   output_ready: boolean;
+  md_ready?: boolean;
+  pdf_ready?: boolean;
 }
 
-export interface DownloadInfo {
-  md_available: boolean;
-  pdf_available: boolean;
-  md_filename?: string;
-  pdf_filename?: string;
+export interface ExtractResponse {
+  success: boolean;
+  totalChapters: number;
+  bookMetadata: BookMetadata;
+}
+
+export interface AnalyzeResponse {
+  success: boolean;
+  chapterIndex: number;
+  analyzedChapters: number;
+  totalChapters: number;
+  completed: boolean;
+}
+
+export interface GenerateResponse {
+  success: boolean;
+  outputUrl: string;
+  filename: string;
 }
 
 @Injectable({
@@ -40,19 +55,18 @@ export interface DownloadInfo {
 export class ApiService {
   private http = inject(HttpClient);
   private baseUrl = environment.apiUrl;
+  
+  // Subject para cancelar processamento
+  private cancelProcessing$ = new Subject<void>();
 
   /**
-   * Upload a book file for analysis
+   * Upload a book file
    */
   uploadBook(file: File): Observable<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Para upload de arquivo, precisa usar multipart/form-data
-    return this.http.post<UploadResponse>(`${this.baseUrl}/api/upload`, formData, {
-      reportProgress: true,
-      // Headers serão definidos automaticamente pelo browser para FormData
-    });
+    return this.http.post<UploadResponse>(`${this.baseUrl}/api/upload`, formData);
   }
 
   /**
@@ -63,10 +77,134 @@ export class ApiService {
   }
 
   /**
-   * Get download info
+   * Extract text and split into chapters
    */
-  getDownloadInfo(jobId: string): Observable<DownloadInfo> {
-    return this.http.get<DownloadInfo>(`${this.baseUrl}/api/download/${jobId}/info`);
+  extractChapters(jobId: string): Observable<ExtractResponse> {
+    return this.http.post<ExtractResponse>(`${this.baseUrl}/api/extract`, { jobId });
+  }
+
+  /**
+   * Analyze a single chapter
+   */
+  analyzeChapter(jobId: string, chapterIndex: number): Observable<AnalyzeResponse> {
+    return this.http.post<AnalyzeResponse>(`${this.baseUrl}/api/analyze`, { 
+      jobId, 
+      chapterIndex 
+    });
+  }
+
+  /**
+   * Generate final Markdown document
+   */
+  generateDocument(jobId: string): Observable<GenerateResponse> {
+    return this.http.post<GenerateResponse>(`${this.baseUrl}/api/generate`, { jobId });
+  }
+
+  /**
+   * Process entire book (orchestrates all steps)
+   * This is called from the frontend to process chapter by chapter
+   */
+  processBook(jobId: string, onProgress: (status: JobStatus) => void): Observable<JobStatus> {
+    return new Observable(observer => {
+      this.runProcessing(jobId, onProgress, observer);
+    });
+  }
+
+  private async runProcessing(
+    jobId: string, 
+    onProgress: (status: JobStatus) => void,
+    observer: any
+  ) {
+    try {
+      // 1. Extract chapters
+      onProgress({
+        job_id: jobId,
+        status: 'extracting',
+        progress: 5,
+        current_step: 'Extraindo texto do arquivo...',
+        output_ready: false
+      });
+
+      const extractResult = await this.extractChapters(jobId).toPromise();
+      
+      if (!extractResult?.success) {
+        throw new Error('Failed to extract chapters');
+      }
+
+      const totalChapters = extractResult.totalChapters;
+
+      // 2. Analyze each chapter
+      for (let i = 0; i < totalChapters; i++) {
+        onProgress({
+          job_id: jobId,
+          status: 'analyzing',
+          progress: 20 + (i / totalChapters) * 60,
+          current_step: `Analisando capítulo ${i + 1} de ${totalChapters}...`,
+          metadata: extractResult.bookMetadata,
+          output_ready: false
+        });
+
+        const analyzeResult = await this.analyzeChapter(jobId, i).toPromise();
+        
+        if (!analyzeResult?.success) {
+          console.warn(`Chapter ${i} analysis failed, continuing...`);
+        }
+
+        // Small delay between chapters to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // 3. Generate final document
+      onProgress({
+        job_id: jobId,
+        status: 'generating',
+        progress: 85,
+        current_step: 'Gerando documento final...',
+        metadata: extractResult.bookMetadata,
+        output_ready: false
+      });
+
+      const generateResult = await this.generateDocument(jobId).toPromise();
+
+      if (!generateResult?.success) {
+        throw new Error('Failed to generate document');
+      }
+
+      // 4. Complete
+      const finalStatus: JobStatus = {
+        job_id: jobId,
+        status: 'completed',
+        progress: 100,
+        current_step: 'Concluído!',
+        metadata: extractResult.bookMetadata,
+        output_ready: true,
+        md_ready: true
+      };
+
+      onProgress(finalStatus);
+      observer.next(finalStatus);
+      observer.complete();
+
+    } catch (error: any) {
+      const errorStatus: JobStatus = {
+        job_id: jobId,
+        status: 'failed',
+        progress: 0,
+        current_step: 'Erro no processamento',
+        error_message: error.message,
+        output_ready: false
+      };
+      
+      onProgress(errorStatus);
+      observer.error(error);
+    }
+  }
+
+  /**
+   * Cancel ongoing processing
+   */
+  cancelProcessing(): void {
+    this.cancelProcessing$.next();
   }
 
   /**
@@ -84,10 +222,10 @@ export class ApiService {
   }
 
   /**
-   * Delete a job
+   * Delete a job (files are auto-deleted on download)
    */
   deleteJob(jobId: string): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(`${this.baseUrl}/api/jobs/${jobId}`);
+    // No Node.js version, files are auto-deleted on download
+    return of({ message: 'Job will be deleted on download' });
   }
 }
-
