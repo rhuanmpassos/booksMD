@@ -1,7 +1,25 @@
 // POST /api/extract - Extrai texto e divide em capítulos
 import { put, list } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pdfParse from 'pdf-parse';
+
+// Importa pdf-parse de forma dinâmica para evitar problemas
+let pdfParse: any;
+
+async function getPdfParser() {
+  if (!pdfParse) {
+    // @ts-ignore
+    pdfParse = (await import('pdf-parse')).default;
+  }
+  return pdfParse;
+}
+
+// Verifica se o buffer parece ser um PDF válido
+function isPdfBuffer(buffer: Buffer): boolean {
+  // PDF começa com %PDF-
+  if (buffer.length < 5) return false;
+  const header = buffer.slice(0, 5).toString('ascii');
+  return header === '%PDF-';
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -121,23 +139,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     // Baixa o arquivo
+    console.log('Downloading file from:', metadata.fileUrl);
     const fileResponse = await fetch(metadata.fileUrl);
+    
+    if (!fileResponse.ok) {
+      throw new Error(`Failed to download file: ${fileResponse.status} ${fileResponse.statusText}`);
+    }
+    
+    const contentType = fileResponse.headers.get('content-type');
+    const contentLength = fileResponse.headers.get('content-length');
+    console.log('Download response:', { contentType, contentLength });
+    
     const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+    console.log('File buffer size:', fileBuffer.length, 'bytes');
 
     // Extrai texto baseado no tipo
     let text = '';
     let bookTitle = metadata.filename.replace(/\.[^/.]+$/, '');
 
     if (metadata.fileType === 'pdf') {
-      const pdfData = await pdfParse(fileBuffer);
-      text = pdfData.text;
-      bookTitle = pdfData.info?.Title || bookTitle;
+      // Valida que é realmente um PDF
+      if (!isPdfBuffer(fileBuffer)) {
+        console.error('Invalid PDF header. First 20 bytes:', fileBuffer.slice(0, 20).toString('hex'));
+        throw new Error('O arquivo não parece ser um PDF válido. Verifique se o arquivo não está corrompido.');
+      }
+      
+      console.log('PDF header validated, parsing...');
+      
+      try {
+        const parser = await getPdfParser();
+        // Opções para pdf-parse com timeout aumentado
+        const options = {
+          // Não renderizar páginas, apenas extrair texto
+          max: 0, // 0 = todas as páginas
+        };
+        const pdfData = await parser(fileBuffer, options);
+        text = pdfData.text || '';
+        bookTitle = pdfData.info?.Title || bookTitle;
+        console.log('PDF parsed successfully. Pages:', pdfData.numpages, 'Text length:', text.length);
+      } catch (pdfError: any) {
+        console.error('PDF parse error:', pdfError);
+        
+        // Tenta identificar o tipo de erro
+        if (pdfError.message?.includes('password')) {
+          throw new Error('O PDF está protegido por senha. Por favor, remova a proteção antes de enviar.');
+        } else if (pdfError.message?.includes('encrypt')) {
+          throw new Error('O PDF está criptografado. Por favor, use um PDF sem criptografia.');
+        } else if (pdfError.message?.includes('Invalid') || pdfError.message?.includes('structure')) {
+          throw new Error('Estrutura do PDF inválida. O arquivo pode estar corrompido ou usar um formato não suportado. Tente converter o PDF para um novo arquivo.');
+        }
+        
+        throw new Error(`Erro ao processar PDF: ${pdfError.message}`);
+      }
     } else if (metadata.fileType === 'txt') {
       text = fileBuffer.toString('utf-8');
     } else if (metadata.fileType === 'epub') {
       // Para EPUB, usaremos uma abordagem simplificada
       // Em produção, usar epub-parser ou similar
       text = fileBuffer.toString('utf-8').replace(/<[^>]*>/g, ' ');
+    }
+    
+    // Verifica se conseguiu extrair algum texto
+    if (!text || text.trim().length < 100) {
+      console.warn('Very little text extracted:', text.length, 'characters');
+      throw new Error('Não foi possível extrair texto suficiente do arquivo. O PDF pode conter apenas imagens ou estar em formato escaneado.');
     }
 
     // Divide em capítulos
@@ -185,9 +250,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('Extract error:', error);
+    
+    // Tenta atualizar o status do job para erro
+    if (req.body?.jobId) {
+      try {
+        await put(`jobs/${req.body.jobId}/metadata.json`, JSON.stringify({
+          id: req.body.jobId,
+          status: 'error',
+          error: error.message,
+          currentStep: 'Erro na extração',
+          progress: 0,
+        }), {
+          access: 'public',
+          contentType: 'application/json',
+        });
+      } catch (e) {
+        console.error('Failed to update job status:', e);
+      }
+    }
+    
     return res.status(500).json({ 
       error: 'Extraction failed', 
-      message: error.message 
+      message: error.message,
+      tip: 'Dicas: 1) Verifique se o PDF não está protegido por senha. 2) Tente converter o PDF para um novo arquivo. 3) Se o PDF é escaneado, o texto não pode ser extraído automaticamente.'
     });
   }
 }
