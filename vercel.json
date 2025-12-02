@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm install && cd frontend && npm install && npm run build -- --configuration production",
+  "buildCommand": "npm install && npm run build",
   "outputDirectory": "frontend/dist/booksmd/browser",
   "functions": {
     "api/**/*.ts": {
