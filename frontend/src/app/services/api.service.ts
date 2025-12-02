@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, Subject, from } from 'rxjs';
+import { Observable, Subject, from, of } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface UploadResponse {
