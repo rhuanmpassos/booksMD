@@ -1,6 +1,7 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build -- --configuration production",
+  "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist/booksmd/browser",
+  "installCommand": "npm install",
   "functions": {
     "api/**/*.ts": {
       "maxDuration": 300,
