@@ -276,9 +276,7 @@ export class HomeComponent {
         this.isUploading = false;
         // Salva as informações do upload no sessionStorage
         sessionStorage.setItem(`job_${response.job_id}`, JSON.stringify({
-          fileUrl: response.fileUrl,
-          filename: response.filename,
-          fileType: response.fileType
+          filename: response.filename
         }));
         this.router.navigate(['/status', response.job_id]);
       },

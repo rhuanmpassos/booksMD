@@ -215,7 +215,7 @@ export class StatusComponent implements OnInit, OnDestroy {
   error = '';
   
   // Informações do upload passadas via navigation state
-  private uploadInfo?: { fileUrl: string; filename: string; fileType: string };
+  private uploadInfo?: { filename: string };
   
   private processingSubscription?: Subscription;
   
@@ -268,14 +268,12 @@ export class StatusComponent implements OnInit, OnDestroy {
     };
     
     // Processa o livro (orquestra todas as etapas)
-    // Passa as informações do upload se disponíveis
     this.processingSubscription = this.api.processBook(
       this.jobId,
       (status) => {
         // Callback de progresso
         this.status = status;
-      },
-      this.uploadInfo
+      }
     ).subscribe({
       next: (finalStatus) => {
         this.status = finalStatus;
