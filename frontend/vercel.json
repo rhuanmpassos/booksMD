@@ -12,8 +12,28 @@
   },
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "source": "/api/upload",
+      "destination": "/api/upload"
+    },
+    {
+      "source": "/api/extract",
+      "destination": "/api/extract"
+    },
+    {
+      "source": "/api/analyze",
+      "destination": "/api/analyze"
+    },
+    {
+      "source": "/api/generate",
+      "destination": "/api/generate"
+    },
+    {
+      "source": "/api/status/:jobId",
+      "destination": "/api/status/:jobId"
+    },
+    {
+      "source": "/api/download/:jobId/:type",
+      "destination": "/api/download/:jobId/:type"
     },
     {
       "source": "/(.*)",
@@ -49,3 +69,4 @@
     }
   ]
 }
+
