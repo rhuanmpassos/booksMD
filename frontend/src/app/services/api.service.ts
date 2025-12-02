@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, from, of } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface UploadResponse {
   job_id: string;
@@ -69,72 +70,37 @@ export class ApiService {
   }
 
   private async uploadToBlob(file: File): Promise<UploadResponse> {
-    let capturedJobId = '';
-
-    // Intercepta a resposta do token para capturar o jobId
-    const originalFetch = window.fetch;
-    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const response = await originalFetch(input, init);
-      
-      // Verifica se é a resposta do upload endpoint
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.includes('/api/upload') && init?.method === 'POST') {
-        try {
-          const clonedResponse = response.clone();
-          const data = await clonedResponse.json();
-          if (data.jobId) {
-            capturedJobId = data.jobId;
-            console.log('Captured jobId:', capturedJobId);
-          }
-        } catch (e) {
-          // Ignora erros de parse
-        }
-      }
-      
-      return response;
-    };
+    // Gera o jobId NO FRONTEND antes do upload
+    const jobId = uuidv4();
+    console.log('Generated jobId on frontend:', jobId);
 
     try {
       // Importa dinamicamente o cliente do Vercel Blob
       const { upload } = await import('@vercel/blob/client');
       
-      const blob = await upload(file.name, file, {
+      // Inclui o jobId no pathname para que o backend possa usar
+      // O formato será: __jobId__<uuid>__<filename>
+      const pathnameWithJobId = `__jobId__${jobId}__${file.name}`;
+      
+      const blob = await upload(pathnameWithJobId, file, {
         access: 'public',
         handleUploadUrl: `${this.baseUrl}/api/upload`,
       });
 
       console.log('Blob upload complete:', blob);
 
-      // Restaura fetch original
-      window.fetch = originalFetch;
-
-      if (!capturedJobId) {
-        // Fallback: tenta extrair da URL do blob
-        const urlParts = blob.url.split('/');
-        const booksIndex = urlParts.findIndex(p => p === 'books');
-        if (booksIndex !== -1 && urlParts[booksIndex + 1]) {
-          capturedJobId = urlParts[booksIndex + 1];
-        }
-      }
-
-      if (!capturedJobId) {
-        console.error('Could not get jobId. Blob:', blob);
-        throw new Error('Failed to get job ID from upload response');
-      }
-
       // Extrai tipo do arquivo
       const fileType = file.name.split('.').pop()?.toLowerCase() || 'pdf';
 
       return {
-        job_id: capturedJobId,
+        job_id: jobId,
         message: 'Upload successful',
         filename: file.name,
         fileUrl: blob.url,
         fileType: fileType,
       };
     } catch (error) {
-      // Restaura fetch original em caso de erro
-      window.fetch = originalFetch;
+      console.error('Upload error:', error);
       throw error;
     }
   }

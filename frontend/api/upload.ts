@@ -2,11 +2,24 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { put } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { v4 as uuidv4 } from 'uuid';
 
 // Tipos de arquivo suportados
 const SUPPORTED_TYPES = ['application/pdf', 'application/epub+zip', 'text/plain'];
 const SUPPORTED_EXTENSIONS = ['pdf', 'epub', 'txt'];
+
+// Extrai jobId e filename real do pathname
+// Formato: __jobId__<uuid>__<filename>
+function parsePathname(pathname: string): { jobId: string; filename: string } {
+  const match = pathname.match(/^__jobId__([a-f0-9-]{36})__(.+)$/i);
+  if (match) {
+    return { jobId: match[1], filename: match[2] };
+  }
+  // Fallback: usa um jobId baseado no hash do pathname
+  return { 
+    jobId: pathname.split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0).toString(16).replace('-', ''),
+    filename: pathname 
+  };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -26,29 +39,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Usa handleUpload do Vercel Blob para client-side upload
     const body = req.body as HandleUploadBody;
     
-    // Gera job ID antes do upload
-    const jobId = uuidv4();
-    let savedFilename = '';
-    let savedFileType = '';
+    let extractedJobId = '';
 
     const jsonResponse = await handleUpload({
       body,
       request: req,
       onBeforeGenerateToken: async (pathname) => {
+        // Extrai o jobId do pathname (vem do frontend)
+        const { jobId, filename } = parsePathname(pathname);
+        extractedJobId = jobId;
+        
+        console.log('Extracted from pathname:', { jobId, filename, originalPathname: pathname });
+        
         // Valida extensão do arquivo
-        const ext = pathname.split('.').pop()?.toLowerCase();
+        const ext = filename.split('.').pop()?.toLowerCase();
         if (!ext || !SUPPORTED_EXTENSIONS.includes(ext)) {
           throw new Error(`Tipo de arquivo não suportado. Use: PDF, EPUB ou TXT`);
         }
-        
-        // Salva para usar depois
-        savedFilename = pathname;
-        savedFileType = ext;
 
         // Cria metadata do job ANTES do upload começar
         const jobMetadata = {
           id: jobId,
-          filename: pathname,
+          filename: filename,
           fileType: ext,
           fileUrl: '', // Será preenchido após upload
           status: 'uploading',
@@ -66,14 +78,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           contentType: 'application/json',
         });
 
-        console.log('Job created:', { jobId, filename: pathname });
+        console.log('Job created:', { jobId, filename });
         
         return {
           allowedContentTypes: SUPPORTED_TYPES,
           maximumSizeInBytes: 1024 * 1024 * 500, // 500MB máximo
-          tokenPayload: JSON.stringify({ jobId, filename: pathname, fileType: ext }),
+          tokenPayload: JSON.stringify({ jobId, filename, fileType: ext }),
           addRandomSuffix: false,
-          pathname: `books/${jobId}/${pathname}`, // Organiza por jobId
+          pathname: `books/${jobId}/${filename}`, // Organiza por jobId com filename limpo
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
@@ -115,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Adiciona jobId na resposta para o cliente
     return res.status(200).json({
       ...jsonResponse,
-      jobId,
+      jobId: extractedJobId,
     });
 
   } catch (error: any) {
