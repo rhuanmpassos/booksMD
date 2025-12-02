@@ -2,41 +2,14 @@
   "buildCommand": "npm install && npm run build -- --configuration production",
   "outputDirectory": "dist/booksmd/browser",
   "functions": {
-    "api/upload.ts": {
-      "maxDuration": 60,
-      "memory": 1024
-    },
     "api/**/*.ts": {
-      "maxDuration": 60
+      "maxDuration": 300,
+      "memory": 1024
     }
   },
   "rewrites": [
     {
-      "source": "/api/upload",
-      "destination": "/api/upload"
-    },
-    {
-      "source": "/api/extract",
-      "destination": "/api/extract"
-    },
-    {
-      "source": "/api/analyze",
-      "destination": "/api/analyze"
-    },
-    {
-      "source": "/api/generate",
-      "destination": "/api/generate"
-    },
-    {
-      "source": "/api/status/:jobId",
-      "destination": "/api/status/:jobId"
-    },
-    {
-      "source": "/api/download/:jobId/:type",
-      "destination": "/api/download/:jobId/:type"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
