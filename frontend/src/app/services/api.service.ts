@@ -75,11 +75,28 @@ export class ApiService {
       handleUploadUrl: `${this.baseUrl}/api/upload`,
     });
 
+    console.log('Blob upload response:', blob);
+
     // Extrai job_id do pathname (formato: books/{jobId}/filename)
-    const pathParts = blob.pathname.split('/');
-    const jobId = pathParts.length >= 2 ? pathParts[1] : '';
+    // pathname pode ser: "books/uuid/filename.pdf" ou apenas o nome do arquivo
+    const pathname = blob.pathname || '';
+    let jobId = '';
+
+    if (pathname.startsWith('books/')) {
+      const pathParts = pathname.split('/');
+      jobId = pathParts[1] || '';
+    } else {
+      // Tenta extrair da URL
+      // URL format: https://xxx.blob.vercel-storage.com/books/uuid/filename.pdf
+      const urlParts = blob.url.split('/');
+      const booksIndex = urlParts.findIndex(p => p === 'books');
+      if (booksIndex !== -1 && urlParts[booksIndex + 1]) {
+        jobId = urlParts[booksIndex + 1];
+      }
+    }
     
     if (!jobId) {
+      console.error('Could not extract jobId. Pathname:', pathname, 'URL:', blob.url);
       throw new Error('Failed to get job ID from upload response');
     }
 
