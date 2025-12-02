@@ -274,7 +274,14 @@ export class HomeComponent {
     this.api.uploadBook(this.selectedFile).subscribe({
       next: (response) => {
         this.isUploading = false;
-        this.router.navigate(['/status', response.job_id]);
+        // Passa as informações do upload via state
+        this.router.navigate(['/status', response.job_id], {
+          state: {
+            fileUrl: response.fileUrl,
+            filename: response.filename,
+            fileType: response.fileType
+          }
+        });
       },
       error: (err) => {
         this.isUploading = false;

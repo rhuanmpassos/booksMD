@@ -7,6 +7,8 @@ export interface UploadResponse {
   job_id: string;
   message: string;
   filename: string;
+  fileUrl: string;
+  fileType: string;
 }
 
 export interface BookMetadata {
@@ -120,10 +122,15 @@ export class ApiService {
         throw new Error('Failed to get job ID from upload response');
       }
 
+      // Extrai tipo do arquivo
+      const fileType = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+
       return {
         job_id: capturedJobId,
         message: 'Upload successful',
         filename: file.name,
+        fileUrl: blob.url,
+        fileType: fileType,
       };
     } catch (error) {
       // Restaura fetch original em caso de erro
@@ -142,8 +149,13 @@ export class ApiService {
   /**
    * Extract text and split into chapters
    */
-  extractChapters(jobId: string): Observable<ExtractResponse> {
-    return this.http.post<ExtractResponse>(`${this.baseUrl}/api/extract`, { jobId });
+  extractChapters(jobId: string, fileUrl?: string, filename?: string, fileType?: string): Observable<ExtractResponse> {
+    return this.http.post<ExtractResponse>(`${this.baseUrl}/api/extract`, { 
+      jobId, 
+      fileUrl, 
+      filename, 
+      fileType 
+    });
   }
 
   /**
@@ -167,16 +179,17 @@ export class ApiService {
    * Process entire book (orchestrates all steps)
    * This is called from the frontend to process chapter by chapter
    */
-  processBook(jobId: string, onProgress: (status: JobStatus) => void): Observable<JobStatus> {
+  processBook(jobId: string, onProgress: (status: JobStatus) => void, uploadInfo?: { fileUrl: string; filename: string; fileType: string }): Observable<JobStatus> {
     return new Observable(observer => {
-      this.runProcessing(jobId, onProgress, observer);
+      this.runProcessing(jobId, onProgress, observer, uploadInfo);
     });
   }
 
   private async runProcessing(
     jobId: string, 
     onProgress: (status: JobStatus) => void,
-    observer: any
+    observer: any,
+    uploadInfo?: { fileUrl: string; filename: string; fileType: string }
   ) {
     try {
       // 1. Extract chapters
@@ -188,7 +201,13 @@ export class ApiService {
         output_ready: false
       });
 
-      const extractResult = await this.extractChapters(jobId).toPromise();
+      // Passa a URL do arquivo se disponível
+      const extractResult = await this.extractChapters(
+        jobId, 
+        uploadInfo?.fileUrl, 
+        uploadInfo?.filename, 
+        uploadInfo?.fileType
+      ).toPromise();
       
       if (!extractResult?.success) {
         throw new Error('Failed to extract chapters');

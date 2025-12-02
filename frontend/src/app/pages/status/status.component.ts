@@ -214,6 +214,9 @@ export class StatusComponent implements OnInit, OnDestroy {
   loading = true;
   error = '';
   
+  // Informações do upload passadas via navigation state
+  private uploadInfo?: { fileUrl: string; filename: string; fileType: string };
+  
   private processingSubscription?: Subscription;
   
   processingSteps = [
@@ -230,6 +233,19 @@ export class StatusComponent implements OnInit, OnDestroy {
     if (!this.jobId) {
       this.router.navigate(['/']);
       return;
+    }
+    
+    // Pega informações do upload do navigation state
+    const navigation = this.router.getCurrentNavigation();
+    const state = navigation?.extras?.state || history.state;
+    
+    if (state?.fileUrl) {
+      this.uploadInfo = {
+        fileUrl: state.fileUrl,
+        filename: state.filename,
+        fileType: state.fileType
+      };
+      console.log('Upload info from state:', this.uploadInfo);
     }
     
     // Inicia o processamento automaticamente
@@ -254,12 +270,14 @@ export class StatusComponent implements OnInit, OnDestroy {
     };
     
     // Processa o livro (orquestra todas as etapas)
+    // Passa as informações do upload se disponíveis
     this.processingSubscription = this.api.processBook(
       this.jobId,
       (status) => {
         // Callback de progresso
         this.status = status;
-      }
+      },
+      this.uploadInfo
     ).subscribe({
       next: (finalStatus) => {
         this.status = finalStatus;

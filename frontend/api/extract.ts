@@ -17,58 +17,97 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { jobId } = req.body;
+  const { jobId, fileUrl, filename, fileType } = req.body;
 
   if (!jobId) {
     return res.status(400).json({ error: 'Job ID is required' });
   }
 
+  console.log('Extract request:', { jobId, fileUrl, filename, fileType });
+
   try {
-    // Busca metadata do job (com retry para esperar o webhook)
     let metadata: any = null;
-    let retries = 5;
-    
-    while (retries > 0) {
-      const { blobs: metadataBlobs } = await list({ prefix: `jobs/${jobId}/metadata.json` });
+
+    // Se o frontend passou a URL do arquivo, usa direto
+    if (fileUrl) {
+      metadata = {
+        id: jobId,
+        filename: filename || 'unknown',
+        fileType: fileType || fileUrl.split('.').pop()?.toLowerCase() || 'pdf',
+        fileUrl: fileUrl,
+        status: 'extracting',
+        progress: 10,
+        currentStep: 'Extraindo texto do arquivo...',
+        chapters: [],
+        totalChapters: 0,
+        analyzedChapters: 0,
+        createdAt: new Date().toISOString(),
+      };
+    } else {
+      // Busca metadata do job (com retry para esperar o webhook)
+      let retries = 5;
       
-      if (metadataBlobs.length > 0) {
-        const metadataResponse = await fetch(metadataBlobs[0].url);
-        metadata = await metadataResponse.json();
-        
-        // Se tem fileUrl, está pronto
-        if (metadata.fileUrl) {
-          break;
-        }
-        
-        // Se ainda está em uploading, busca o arquivo diretamente
-        if (metadata.status === 'uploading') {
-          const { blobs: bookBlobs } = await list({ prefix: `books/${jobId}/` });
-          if (bookBlobs.length > 0) {
-            metadata.fileUrl = bookBlobs[0].url;
+      console.log('Searching for job metadata...');
+      
+      while (retries > 0) {
+        try {
+          const listResult = await list({ prefix: `jobs/${jobId}/` });
+          console.log(`List result for jobs/${jobId}/:`, listResult.blobs.map(b => b.pathname));
+          
+          const metadataBlob = listResult.blobs.find(b => b.pathname.includes('metadata.json'));
+          
+          if (metadataBlob) {
+            console.log('Found metadata blob:', metadataBlob.url);
+            const metadataResponse = await fetch(metadataBlob.url);
+            metadata = await metadataResponse.json();
+            console.log('Metadata:', metadata);
+            
+            // Se tem fileUrl, está pronto
+            if (metadata.fileUrl) {
+              break;
+            }
+          }
+          
+          // Busca o arquivo diretamente
+          const bookListResult = await list({ prefix: `books/${jobId}/` });
+          console.log(`List result for books/${jobId}/:`, bookListResult.blobs.map(b => b.pathname));
+          
+          if (bookListResult.blobs.length > 0) {
+            const bookBlob = bookListResult.blobs[0];
+            if (!metadata) {
+              metadata = {
+                id: jobId,
+                filename: bookBlob.pathname.split('/').pop() || 'unknown',
+                fileType: bookBlob.pathname.split('.').pop()?.toLowerCase() || 'pdf',
+                fileUrl: bookBlob.url,
+                status: 'extracting',
+                progress: 10,
+                currentStep: 'Extraindo texto do arquivo...',
+                chapters: [],
+                totalChapters: 0,
+                analyzedChapters: 0,
+                createdAt: new Date().toISOString(),
+              };
+            } else {
+              metadata.fileUrl = bookBlob.url;
+            }
             break;
           }
+        } catch (listError) {
+          console.error('List error:', listError);
         }
-      }
-      
-      retries--;
-      if (retries > 0) {
-        // Espera 1 segundo antes de tentar novamente
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        retries--;
+        if (retries > 0) {
+          console.log(`Retry ${5 - retries}/5...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
     }
     
-    if (!metadata) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
-
-    // Se ainda não tem fileUrl, tenta buscar o arquivo diretamente
-    if (!metadata.fileUrl) {
-      const { blobs: bookBlobs } = await list({ prefix: `books/${jobId}/` });
-      if (bookBlobs.length > 0) {
-        metadata.fileUrl = bookBlobs[0].url;
-      } else {
-        return res.status(404).json({ error: 'File not found for job' });
-      }
+    if (!metadata || !metadata.fileUrl) {
+      console.error('Job not found or no fileUrl:', { jobId, metadata });
+      return res.status(404).json({ error: 'Job not found', jobId });
     }
 
     // Atualiza status
