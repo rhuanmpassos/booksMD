@@ -24,20 +24,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Busca metadata do job
-    const { blobs: metadataBlobs } = await list({ prefix: `jobs/${jobId}/metadata.json` });
+    // Busca metadata do job (com retry para esperar o webhook)
+    let metadata: any = null;
+    let retries = 5;
     
-    if (metadataBlobs.length === 0) {
+    while (retries > 0) {
+      const { blobs: metadataBlobs } = await list({ prefix: `jobs/${jobId}/metadata.json` });
+      
+      if (metadataBlobs.length > 0) {
+        const metadataResponse = await fetch(metadataBlobs[0].url);
+        metadata = await metadataResponse.json();
+        
+        // Se tem fileUrl, está pronto
+        if (metadata.fileUrl) {
+          break;
+        }
+        
+        // Se ainda está em uploading, busca o arquivo diretamente
+        if (metadata.status === 'uploading') {
+          const { blobs: bookBlobs } = await list({ prefix: `books/${jobId}/` });
+          if (bookBlobs.length > 0) {
+            metadata.fileUrl = bookBlobs[0].url;
+            break;
+          }
+        }
+      }
+      
+      retries--;
+      if (retries > 0) {
+        // Espera 1 segundo antes de tentar novamente
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    if (!metadata) {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    const metadataResponse = await fetch(metadataBlobs[0].url);
-    const metadata = await metadataResponse.json();
+    // Se ainda não tem fileUrl, tenta buscar o arquivo diretamente
+    if (!metadata.fileUrl) {
+      const { blobs: bookBlobs } = await list({ prefix: `books/${jobId}/` });
+      if (bookBlobs.length > 0) {
+        metadata.fileUrl = bookBlobs[0].url;
+      } else {
+        return res.status(404).json({ error: 'File not found for job' });
+      }
+    }
 
     // Atualiza status
     metadata.status = 'extracting';
     metadata.currentStep = 'Extraindo texto do arquivo...';
-    metadata.progress = 5;
+    metadata.progress = 10;
 
     await put(`jobs/${jobId}/metadata.json`, JSON.stringify(metadata), {
       access: 'public',

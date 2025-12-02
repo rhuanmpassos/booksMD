@@ -28,6 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Gera job ID antes do upload
     const jobId = uuidv4();
+    let savedFilename = '';
+    let savedFileType = '';
 
     const jsonResponse = await handleUpload({
       body,
@@ -39,10 +41,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           throw new Error(`Tipo de arquivo não suportado. Use: PDF, EPUB ou TXT`);
         }
         
+        // Salva para usar depois
+        savedFilename = pathname;
+        savedFileType = ext;
+
+        // Cria metadata do job ANTES do upload começar
+        const jobMetadata = {
+          id: jobId,
+          filename: pathname,
+          fileType: ext,
+          fileUrl: '', // Será preenchido após upload
+          status: 'uploading',
+          progress: 0,
+          currentStep: 'Enviando arquivo...',
+          chapters: [] as string[],
+          totalChapters: 0,
+          analyzedChapters: 0,
+          createdAt: new Date().toISOString(),
+        };
+
+        // Salva metadata inicial do job no Blob
+        await put(`jobs/${jobId}/metadata.json`, JSON.stringify(jobMetadata), {
+          access: 'public',
+          contentType: 'application/json',
+        });
+
+        console.log('Job created:', { jobId, filename: pathname });
+        
         return {
           allowedContentTypes: SUPPORTED_TYPES,
           maximumSizeInBytes: 1024 * 1024 * 500, // 500MB máximo
-          tokenPayload: JSON.stringify({ jobId }),
+          tokenPayload: JSON.stringify({ jobId, filename: pathname, fileType: ext }),
           addRandomSuffix: false,
           pathname: `books/${jobId}/${pathname}`, // Organiza por jobId
         };
@@ -52,25 +81,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const payload = JSON.parse(tokenPayload || '{}');
           const currentJobId = payload.jobId;
-          const filename = blob.pathname.split('/').pop() || 'unknown';
-          const ext = filename.split('.').pop()?.toLowerCase() || '';
+          const filename = payload.filename || blob.pathname.split('/').pop() || 'unknown';
+          const ext = payload.fileType || filename.split('.').pop()?.toLowerCase() || '';
 
-          // Cria metadata do job
+          // Atualiza metadata do job com a URL do arquivo
           const jobMetadata = {
             id: currentJobId,
             filename,
             fileType: ext,
             fileUrl: blob.url,
             status: 'pending',
-            progress: 0,
-            currentStep: 'Arquivo enviado. Aguardando processamento.',
+            progress: 5,
+            currentStep: 'Arquivo enviado. Pronto para processamento.',
             chapters: [] as string[],
             totalChapters: 0,
             analyzedChapters: 0,
             createdAt: new Date().toISOString(),
           };
 
-          // Salva metadata do job no Blob
+          // Salva metadata atualizada
           await put(`jobs/${currentJobId}/metadata.json`, JSON.stringify(jobMetadata), {
             access: 'public',
             contentType: 'application/json',
