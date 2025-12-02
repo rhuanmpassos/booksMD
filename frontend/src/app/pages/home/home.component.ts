@@ -274,14 +274,13 @@ export class HomeComponent {
     this.api.uploadBook(this.selectedFile).subscribe({
       next: (response) => {
         this.isUploading = false;
-        // Passa as informações do upload via state
-        this.router.navigate(['/status', response.job_id], {
-          state: {
-            fileUrl: response.fileUrl,
-            filename: response.filename,
-            fileType: response.fileType
-          }
-        });
+        // Salva as informações do upload no sessionStorage
+        sessionStorage.setItem(`job_${response.job_id}`, JSON.stringify({
+          fileUrl: response.fileUrl,
+          filename: response.filename,
+          fileType: response.fileType
+        }));
+        this.router.navigate(['/status', response.job_id]);
       },
       error: (err) => {
         this.isUploading = false;

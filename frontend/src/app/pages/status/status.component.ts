@@ -235,17 +235,15 @@ export class StatusComponent implements OnInit, OnDestroy {
       return;
     }
     
-    // Pega informações do upload do navigation state
-    const navigation = this.router.getCurrentNavigation();
-    const state = navigation?.extras?.state || history.state;
-    
-    if (state?.fileUrl) {
-      this.uploadInfo = {
-        fileUrl: state.fileUrl,
-        filename: state.filename,
-        fileType: state.fileType
-      };
-      console.log('Upload info from state:', this.uploadInfo);
+    // Pega informações do upload do sessionStorage
+    const storedData = sessionStorage.getItem(`job_${this.jobId}`);
+    if (storedData) {
+      try {
+        this.uploadInfo = JSON.parse(storedData);
+        console.log('Upload info from sessionStorage:', this.uploadInfo);
+      } catch (e) {
+        console.error('Error parsing stored upload info:', e);
+      }
     }
     
     // Inicia o processamento automaticamente
